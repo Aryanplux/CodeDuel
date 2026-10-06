@@ -1,0 +1,30 @@
+spring:
+  application:
+    name: CodeDuel
+  
+  # PostgreSQL Connection
+  datasource:
+    url: jdbc:postgresql://localhost:5432/codeduel
+    username: postgres
+    password: postgrespassword
+    driver-class-name: org.postgresql.Driver
+
+  # JPA & Hibernate Settings
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: true
+    properties:
+      hibernate:
+        format_sql: true
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+
+  # Redis Connection
+  data:
+    redis:
+      host: localhost
+      port: 6379
+
+# Judge0 Execution Engine Host
+judge0:
+  url: http://localhost:2358

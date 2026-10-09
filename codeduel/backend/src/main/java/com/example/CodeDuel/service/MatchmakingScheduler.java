@@ -31,6 +31,8 @@ public class MatchmakingScheduler {
         this.matchService = matchService;
     }
 
+    
+
     @Scheduled(fixedDelay = 1000) // Runs every 1 second[cite: 27]
     public void matchPlayers() {
         try {

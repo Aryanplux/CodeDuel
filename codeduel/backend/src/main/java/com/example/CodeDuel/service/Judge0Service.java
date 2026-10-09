@@ -1,82 +1,62 @@
 package com.example.CodeDuel.service;
 
-import com.example.CodeDuel.dto.JudgeRequest;
-import com.example.CodeDuel.dto.JudgeResponse;
-import com.example.CodeDuel.entity.TestCase;
-import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.HttpEntity;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
-import org.springframework.web.reactive.function.client.WebClient;
+import org.springframework.web.client.RestTemplate;
 
-import java.util.List;
+import java.util.HashMap;
+import java.util.Map;
 
 @Service
 public class Judge0Service {
 
-    private final WebClient webClient;
+    private final RestTemplate restTemplate = new RestTemplate();
+    private static final String JUDGE0_URL = "http://localhost:2358/submissions?wait=true";
 
-    public Judge0Service(@Value("${judge0.url}") String judge0Url) {
-        this.webClient = WebClient.builder()
-                .baseUrl(judge0Url)
-                .build();
+    /**
+     * Map language string to Judge0 Language ID
+     */
+    public int getLanguageId(String language) {
+        return switch (language.toLowerCase().trim()) {
+            case "python", "python3" -> 71; // Python (3.8.1)
+            case "java" -> 62;             // Java (OpenJDK 13.0.1)
+            case "cpp", "c++" -> 54;        // C++ (GCC 9.2.0)
+            default -> throw new IllegalArgumentException("Unsupported language: " + language);
+        };
     }
 
     /**
-     * Executes single code input against Judge0 synchronously.
+     * Sends code execution payload to Judge0 sandbox
      */
-    public JudgeResponse executeSingleTest(String sourceCode, int languageId, String stdin, String expectedOutput, float timeLimit) {
-        JudgeRequest request = JudgeRequest.builder()
-                .sourceCode(sourceCode)
-                .languageId(languageId)
-                .stdin(stdin)
-                .expectedOutput(expectedOutput)
-                .cpuTimeLimit(timeLimit)
-                .build();
-
-        return webClient.post()
-                .uri("/submissions?wait=true")
-                .bodyValue(request)
-                .retrieve()
-                .bodyToMono(JudgeResponse.class)
-                .block(); // Blocking call for synchronous batch judging
-    }
-
-    /**
-     * Iterates over visible and hidden test cases for a problem and aggregates total passes[cite: 18, 28].
-     */
-    public ExecutionSummary evaluateAllTests(String sourceCode, int languageId, List<TestCase> testCases, float timeLimit) {
-        int passedCount = 0;
-        String overallVerdict = "ACCEPTED";
-
-        for (TestCase test : testCases) {
-            JudgeResponse response = executeSingleTest(sourceCode, languageId, test.getInput(), test.getExpectedOutput(), timeLimit);
-
-            if (response == null || response.getStatus() == null
-                    || response.getStatus().getId() == null) {
-                return new ExecutionSummary(0, testCases.size(), "SYSTEM_ERROR");
-            }
-
-            if (response.isCompileError()) {
-                return new ExecutionSummary(0, testCases.size(), "COMPILATION_ERROR");
-            }
-
-            if (response.isAccepted()) {
-                passedCount++;
-            } else {
-                String description = response.getStatus().getDescription();
-                overallVerdict = description == null
-                        ? "SYSTEM_ERROR"
-                        : description.toUpperCase().replace(' ', '_');
-                // Stop evaluation on first failure to save resources
-                break; 
-            }
+    @SuppressWarnings("unchecked")
+    public Map<String, Object> executeCode(String sourceCode, int languageId, String stdin, String expectedOutput) {
+        Map<String, Object> requestBody = new HashMap<>();
+        requestBody.put("source_code", sourceCode);
+        requestBody.put("language_id", languageId);
+        if (stdin != null && !stdin.isBlank()) {
+            requestBody.put("stdin", stdin.trim());
+        }
+        if (expectedOutput != null && !expectedOutput.isBlank()) {
+            requestBody.put("expected_output", expectedOutput.trim());
         }
 
-        if (passedCount == testCases.size()) {
-            overallVerdict = "ACCEPTED";
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_JSON);
+
+        HttpEntity<Map<String, Object>> entity = new HttpEntity<>(requestBody, headers);
+
+        try {
+            ResponseEntity<Map> response = restTemplate.postForEntity(JUDGE0_URL, entity, Map.class);
+            return response.getBody() != null ? response.getBody() : Map.of();
+        } catch (Exception e) {
+            System.err.println("[Judge0Service] Error communicating with Judge0: " + e.getMessage());
+            Map<String, Object> errorResult = new HashMap<>();
+            errorResult.put("status", Map.of("id", 13, "description", "Internal Judge Error"));
+            errorResult.put("stderr", e.getMessage());
+            return errorResult;
         }
-
-        return new ExecutionSummary(passedCount, testCases.size(), overallVerdict);
     }
-
-    public record ExecutionSummary(int passedCount, int totalCount, String verdict) {}
 }

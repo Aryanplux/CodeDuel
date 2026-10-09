@@ -1,24 +1,25 @@
 package com.example.CodeDuel.controller;
 
-import com.example.CodeDuel.service.MatchService;
+import com.example.CodeDuel.model.BattleSession;
+import com.example.CodeDuel.repository.BattleSessionRepository;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.Map;
-
 @RestController
 @RequestMapping("/api/battles")
+@CrossOrigin(origins = "*")
 public class BattleController {
 
-    private final MatchService matchService;
+    private final BattleSessionRepository battleSessionRepository;
 
-    public BattleController(MatchService matchService) {
-        this.matchService = matchService;
+    public BattleController(BattleSessionRepository battleSessionRepository) {
+        this.battleSessionRepository = battleSessionRepository;
     }
 
-    @GetMapping("/{matchId}")
-    public ResponseEntity<Map<Object, Object>> getBattle(@PathVariable String matchId) {
-        Map<Object, Object> match = matchService.getMatch(matchId);
-        return match.isEmpty() ? ResponseEntity.notFound().build() : ResponseEntity.ok(match);
+    @GetMapping("/{battleId}")
+    public ResponseEntity<BattleSession> getBattleDetails(@PathVariable String battleId) {
+        return battleSessionRepository.findById(battleId)
+                .map(ResponseEntity::ok)
+                .orElse(ResponseEntity.notFound().build());
     }
 }

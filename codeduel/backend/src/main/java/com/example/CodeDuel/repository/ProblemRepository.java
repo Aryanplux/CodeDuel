@@ -1,14 +1,15 @@
 package com.example.CodeDuel.repository;
 
-import com.example.CodeDuel.entity.Problem;
-import org.springframework.data.jpa.repository.EntityGraph;
+import com.example.CodeDuel.model.Problem;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.stereotype.Repository;
 
 import java.util.Optional;
 
+@Repository
 public interface ProblemRepository extends JpaRepository<Problem, Long> {
 
-    @Override
-    @EntityGraph(attributePaths = "testCases")
-    Optional<Problem> findById(Long id);
+    @Query(value = "SELECT * FROM problems ORDER BY RANDOM() LIMIT 1", nativeQuery = true)
+    Optional<Problem> findRandomProblem();
 }

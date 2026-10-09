@@ -4,7 +4,7 @@ spring:
   
   # PostgreSQL Connection
   datasource:
-    url: jdbc:postgresql://localhost:5432/codeduel
+    url: jdbc:postgresql://localhost:5433/codeduel
     username: postgres
     password: postgrespassword
     driver-class-name: org.postgresql.Driver

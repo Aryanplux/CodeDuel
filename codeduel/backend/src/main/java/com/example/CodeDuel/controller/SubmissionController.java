@@ -1,92 +1,158 @@
 package com.example.CodeDuel.controller;
 
-import com.example.CodeDuel.entity.Submission;
-import com.example.CodeDuel.entity.TestCase;
-import com.example.CodeDuel.entity.Problem;
-import com.example.CodeDuel.repository.ProblemRepository;
-import com.example.CodeDuel.repository.SubmissionRepository;
+import com.example.CodeDuel.dto.SubmissionRequest;
+import com.example.CodeDuel.dto.SubmissionResponse;
+import com.example.CodeDuel.model.BattleSession;
+import com.example.CodeDuel.model.Problem;
+import com.example.CodeDuel.repository.BattleSessionRepository;
 import com.example.CodeDuel.service.Judge0Service;
-import com.example.CodeDuel.service.Judge0Service.ExecutionSummary;
+import tools.jackson.core.type.TypeReference;
+import tools.jackson.databind.ObjectMapper;
 import org.springframework.http.ResponseEntity;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.web.bind.annotation.*;
 
-import java.time.LocalDateTime;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 @RestController
 @RequestMapping("/api/submissions")
+@CrossOrigin(origins = "*")
 public class SubmissionController {
 
+    private final BattleSessionRepository battleSessionRepository;
     private final Judge0Service judge0Service;
     private final SimpMessagingTemplate messagingTemplate;
-    private final ProblemRepository problemRepository;
-    private final SubmissionRepository submissionRepository;
+    private final ObjectMapper objectMapper = new ObjectMapper();
 
-    public SubmissionController(
-            Judge0Service judge0Service,
-            SimpMessagingTemplate messagingTemplate,
-            ProblemRepository problemRepository,
-            SubmissionRepository submissionRepository) {
+    public SubmissionController(BattleSessionRepository battleSessionRepository,
+                                Judge0Service judge0Service,
+                                SimpMessagingTemplate messagingTemplate) {
+        this.battleSessionRepository = battleSessionRepository;
         this.judge0Service = judge0Service;
         this.messagingTemplate = messagingTemplate;
-        this.problemRepository = problemRepository;
-        this.submissionRepository = submissionRepository;
     }
 
     @PostMapping
-    public ResponseEntity<Submission> submitCode(@RequestBody Submission request) {
-        request.setSubmittedAt(LocalDateTime.now());
-        request.setStatus("PROCESSING");
+    public ResponseEntity<SubmissionResponse> submitCode(@RequestBody SubmissionRequest request) {
+        if (request == null || request.getBattleId() == null || request.getSourceCode() == null
+                || request.getUserId() == null || request.getLanguage() == null) {
+            return ResponseEntity.badRequest().body(
+                    SubmissionResponse.builder()
+                            .verdict("BAD_REQUEST")
+                            .errorMessage("battleId, userId, language, and sourceCode are required.")
+                            .build()
+            );
+        }
 
-        List<TestCase> testCases = findTestCases(request.getProblemId());
+        // 1. Fetch Battle Session & Problem
+        Optional<BattleSession> sessionOpt = battleSessionRepository.findById(request.getBattleId());
+        if (sessionOpt.isEmpty()) {
+            return ResponseEntity.badRequest().body(
+                    SubmissionResponse.builder()
+                            .verdict("BATTLE_NOT_FOUND")
+                            .errorMessage("Battle session with ID " + request.getBattleId() + " does not exist.")
+                            .build()
+            );
+        }
 
-        ExecutionSummary summary = judge0Service.evaluateAllTests(
-                request.getSourceCode(),
-                request.getLanguageId(),
-                testCases,
-                findTimeLimit(request.getProblemId()));
+        BattleSession session = sessionOpt.get();
+        Problem problem = session.getProblem();
 
-        request.setTestsPassed(summary.passedCount());
-        request.setTotalTests(summary.totalCount());
-        request.setStatus(summary.verdict());
-        Submission savedSubmission = submissionRepository.save(request);
+        // 2. Parse Test Cases (Fallback to Sample Cases if Hidden Json is missing)
+        List<String> inputs = parseJsonArray(problem.getHiddenInputsJson(), problem.getSampleInput());
+        List<String> expectedOutputs = parseJsonArray(problem.getHiddenOutputsJson(), problem.getSampleOutput());
 
-        Map<String, Object> wsPayload = Map.of(
-                "event", "PLAYER_SUBMITTED",
-                "userId", savedSubmission.getUserId(),
-                "testsPassed", summary.passedCount(),
-                "totalTests", summary.totalCount(),
-                "status", summary.verdict());
+        int totalTests = inputs.size();
+        int testsPassed = 0;
+        int languageId = judge0Service.getLanguageId(request.getLanguage());
 
+        String finalVerdict = "ACCEPTED";
+        String lastStdout = "";
+        String errorMessage = "";
+        String execTime = "0.0";
+        String memory = "0";
+
+        // 3. Run Code Against Each Test Case in Judge0
+        for (int i = 0; i < totalTests; i++) {
+            String testInput = inputs.get(i);
+            String expectedOut = expectedOutputs.get(i);
+
+            Map<String, Object> judgeResult = judge0Service.executeCode(
+                    request.getSourceCode(),
+                    languageId,
+                    testInput,
+                    expectedOut
+            );
+
+            Map<?, ?> status = judgeResult.get("status") instanceof Map<?, ?> statusValue
+                    ? statusValue
+                    : Map.of();
+            int statusId = status.get("id") instanceof Number id ? id.intValue() : 13;
+            String statusDesc = status.get("description") instanceof String description
+                    ? description
+                    : "Unknown Error";
+
+            lastStdout = judgeResult.get("stdout") != null ? (String) judgeResult.get("stdout") : "";
+            String stderr = judgeResult.get("stderr") != null ? (String) judgeResult.get("stderr") : "";
+            String compileOutput = judgeResult.get("compile_output") != null ? (String) judgeResult.get("compile_output") : "";
+
+            execTime = judgeResult.get("time") != null ? String.valueOf(judgeResult.get("time")) : execTime;
+            memory = judgeResult.get("memory") != null ? String.valueOf(judgeResult.get("memory")) : memory;
+
+            // Status ID 3 = Accepted in Judge0
+            if (statusId == 3) {
+                testsPassed++;
+            } else if (statusId == 6) { // Compilation Error
+                finalVerdict = "COMPILE_ERROR";
+                errorMessage = compileOutput;
+                break;
+            } else if (statusId == 5) { // Time Limit Exceeded
+                finalVerdict = "TIME_LIMIT_EXCEEDED";
+                errorMessage = "Time Limit Exceeded on test case " + (i + 1);
+                break;
+            } else if (statusId == 4) { // Wrong Answer
+                finalVerdict = "WRONG_ANSWER";
+                errorMessage = "Wrong Answer on test case " + (i + 1);
+                break;
+            } else { // Runtime Error or internal error
+                finalVerdict = "RUNTIME_ERROR";
+                errorMessage = !stderr.isBlank() ? stderr : statusDesc;
+                break;
+            }
+        }
+
+        // 4. Construct Submission Result
+        SubmissionResponse response = SubmissionResponse.builder()
+                .verdict(finalVerdict)
+                .testsPassed(testsPassed)
+                .totalTests(totalTests)
+                .output(lastStdout.trim())
+                .executionTime(execTime + "s")
+                .memoryUsed(memory + " KB")
+                .errorMessage(errorMessage)
+                .build();
+
+        // 5. Broadcast Live Opponent Progress via WebSocket
+        Map<String, Object> progressUpdate = Map.of(
+                "type", "OPPONENT_SUBMISSION",
+                "submitterId", request.getUserId(),
+                "verdict", finalVerdict,
+                "testsPassed", testsPassed,
+                "totalTests", totalTests
+        );
         messagingTemplate.convertAndSend(
-                "/topic/battle/" + savedSubmission.getBattleId(),
-                (Object) wsPayload);
+                "/topic/battle/" + request.getBattleId(),
+                (Object) progressUpdate);
 
-        return ResponseEntity.ok(savedSubmission);
+        return ResponseEntity.ok(response);
     }
 
-    private List<TestCase> findTestCases(Long problemId) {
-        if (problemId != null) {
-            Problem problem = problemRepository.findById(problemId).orElse(null);
-            if (problem != null && problem.getTestCases() != null && !problem.getTestCases().isEmpty()) {
-                return problem.getTestCases();
-            }
+    private List<String> parseJsonArray(String json, String fallback) {
+        if (json != null && !json.isBlank()) {
+            try {
+                return objectMapper.readValue(json, new TypeReference<List<String>>() {});
+            } catch (Exception ignored) {}
         }
-
-        return List.of(
-                new TestCase(1L, "2 3\n", "5\n", false),
-                new TestCase(2L, "10 20\n", "30\n", true));
-    }
-
-    private float findTimeLimit(Long problemId) {
-        if (problemId != null) {
-            Problem problem = problemRepository.findById(problemId).orElse(null);
-            if (problem != null && problem.getTimeLimit() != null) {
-                return problem.getTimeLimit();
-            }
-        }
-        return 2.0f;
+        return List.of(fallback != null ? fallback : "");
     }
 }

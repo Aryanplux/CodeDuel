@@ -1,5 +1,6 @@
 package com.example.CodeDuel.entity;
 
+import com.example.CodeDuel.model.Problem;
 import jakarta.persistence.*;
 import lombok.*;
 

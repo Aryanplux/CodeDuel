@@ -9,6 +9,7 @@ import org.springframework.web.bind.annotation.*;
 
 @RestController
 @RequestMapping("/api/matchmaking")
+@CrossOrigin(origins = "*") // Allows cross-origin requests from React dev server (port 5173)
 public class MatchmakingController {
 
     private final MatchmakingService matchmakingService;
@@ -24,9 +25,12 @@ public class MatchmakingController {
             return ResponseEntity.badRequest().body("userId and a non-negative finite rating are required");
         }
 
-        matchmakingService.joinQueue(request.userId().trim(), request.rating(),
-                request.username() == null || request.username().isBlank()
-                        ? request.userId().trim() : request.username().trim());
+        matchmakingService.joinQueue(
+            request.userId().trim(),
+            request.rating(),
+            request.username() == null || request.username().isBlank()
+                    ? request.userId().trim() : request.username().trim()
+        );
         return ResponseEntity.ok("Added to queue");
     }
 

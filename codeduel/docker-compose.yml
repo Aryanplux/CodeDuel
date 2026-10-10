@@ -1,12 +1,9 @@
-# Configure docker-compose.yml
-# Create a local setup running PostgreSQL, Redis, and Judge0 (with its PostgreSQL and Redis dependencies)
-
 version: '3.8'
 
 services:
-  postgres:
+  app-db:
     image: postgres:15-alpine
-    container_name: codeduel-db
+    container_name: codeduel-app-db
     environment:
       POSTGRES_DB: codeduel
       POSTGRES_USER: postgres
@@ -14,13 +11,23 @@ services:
     ports:
       - "5433:5432"
     volumes:
-      - pgdata:/var/lib/postgresql/data
+      - app-pgdata:/var/lib/postgresql/data
 
   redis:
     image: redis:7-alpine
     container_name: codeduel-redis
     ports:
       - "6379:6379"
+
+  judge0-db:
+    image: postgres:15-alpine
+    container_name: codeduel-judge0-db
+    environment:
+      POSTGRES_DB: judge0
+      POSTGRES_USER: judge0
+      POSTGRES_PASSWORD: judge0password
+    volumes:
+      - judge0-pgdata:/var/lib/postgresql/data
 
   judge0-server:
     image: judge0/judge0:latest
@@ -30,14 +37,15 @@ services:
     environment:
       REDIS_HOST: redis
       REDIS_PORT: 6379
-      POSTGRES_HOST: postgres
+      POSTGRES_HOST: judge0-db
       POSTGRES_PORT: 5432
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgrespassword
-      POSTGRES_DB: codeduel
+      POSTGRES_USER: judge0
+      POSTGRES_PASSWORD: judge0password
+      POSTGRES_DB: judge0
     depends_on:
-      - postgres
+      - judge0-db
       - redis
 
 volumes:
-  pgdata:
+  app-pgdata:
+  judge0-pgdata:

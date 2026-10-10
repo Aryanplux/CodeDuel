@@ -1,8 +1,10 @@
 package com.example.CodeDuel.model;
 
+import java.util.ArrayList;
 import java.util.List;
 
 import com.example.CodeDuel.entity.TestCase;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 
 import jakarta.persistence.*;
 import lombok.*;
@@ -20,7 +22,7 @@ public class Problem {
     private Long id;
 
     private String title;
-    
+
     private String difficulty; // "EASY", "MEDIUM", "HARD"
 
     @Column(columnDefinition = "TEXT")
@@ -41,20 +43,23 @@ public class Problem {
     @Column(columnDefinition = "TEXT")
     private String sampleOutput;
 
-    // Hidden test cases sent to Judge0 (JSON format e.g. ["2 7 11 15\n9", "3 2 4\n6"])
+    // Hidden test cases stored as JSON arrays for Judge0 execution
     @Column(columnDefinition = "TEXT")
     private String hiddenInputsJson;
 
     @Column(columnDefinition = "TEXT")
     private String hiddenOutputsJson;
 
-    public Object getTimeLimit() {
-        // TODO Auto-generated method stub
-        throw new UnsupportedOperationException("Unimplemented method 'getTimeLimit'");
-    }
+    // Execution limits per the documentation spec
+    @Builder.Default
+    private Float timeLimit = 2.0f; // seconds
 
-    public List<TestCase> getTestCases() {
-        // TODO Auto-generated method stub
-        throw new UnsupportedOperationException("Unimplemented method 'getTestCases'");
-    }
+    @Builder.Default
+    private Integer memoryLimit = 256000; // KB (256 MB)
+
+    // Bidirectional relationship with TestCase entity
+    @OneToMany(mappedBy = "problem", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
+    @JsonIgnore
+    @Builder.Default
+    private List<TestCase> testCases = new ArrayList<>();
 }

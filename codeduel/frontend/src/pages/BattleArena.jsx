@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import Editor from '@monaco-editor/react';
 import axios from 'axios';
@@ -18,6 +18,7 @@ export default function BattleArena() {
   // Editor state
   const [selectedLanguage, setSelectedLanguage] = useState('python');
   const [code, setCode] = useState('');
+  const editorRef = useRef(null);
 
   // Execution & UI state
   const [submitting, setSubmitting] = useState(false);
@@ -31,18 +32,22 @@ export default function BattleArena() {
 
   // 1. Fetch Battle Details & Setup Current User Session
   useEffect(() => {
-    const currentUserId = sessionStorage.getItem('userId') || 'player_' + Math.floor(Math.random() * 1000);
+    const currentUserId = sessionStorage.getItem('cd_user_id') || 'player_' + Math.floor(Math.random() * 1000);
     setUserId(currentUserId);
 
     if (!battleId) return;
 
-    axios.get(`http://localhost:8081/api/battles/${battleId}`)
+    axios.get(`/api/battles/${battleId}`)
       .then(res => {
         const data = res.data;
         const prob = data.problem;
 
         setProblem(prob);
-        setCode(prob.starterCodePython || '');
+        const starter = prob.starterCodePython || '';
+        setCode(starter);
+        if (editorRef.current) {
+          editorRef.current.setValue(starter);
+        }
 
         // Determine opponent ID
         const opp = data.player1Id === currentUserId ? data.player2Id : data.player1Id;
@@ -76,7 +81,7 @@ export default function BattleArena() {
   useEffect(() => {
     if (!battleId) return;
 
-    const socket = new SockJS('http://localhost:8081/ws');
+    const socket = new SockJS('/ws');
     const stompClient = new Client({
       webSocketFactory: () => socket,
       reconnectDelay: 5000,
@@ -107,25 +112,66 @@ export default function BattleArena() {
     setSelectedLanguage(lang);
     if (!problem) return;
 
-    if (lang === 'python') setCode(problem.starterCodePython || '');
-    else if (lang === 'java') setCode(problem.starterCodeJava || '');
-    else if (lang === 'cpp') setCode(problem.starterCodeCpp || '');
+    let newCode = '';
+    if (lang === 'python') newCode = problem.starterCodePython || '';
+    else if (lang === 'java') newCode = problem.starterCodeJava || '';
+    else if (lang === 'cpp') newCode = problem.starterCodeCpp || '';
+    
+    setCode(newCode);
+    if (editorRef.current) {
+      editorRef.current.setValue(newCode);
+    }
   };
 
   // 5. Handle Solution Submission (to Judge0 via Spring Boot)
   const handleSubmitSolution = async () => {
+    // Determine active source code from Monaco Editor instance or React state
+    const currentCode = editorRef.current ? editorRef.current.getValue() : code;
+    const effectiveCode = (currentCode !== undefined && currentCode !== null) ? currentCode : '';
+
+    if (effectiveCode !== code) {
+      setCode(effectiveCode);
+    }
+
+    // Client-side guard check: prevent blank source code submission
+    if (!effectiveCode.trim()) {
+      setActiveTab('output');
+      setConsoleOutput("⚠️ Source code cannot be blank. Please write your solution before submitting.");
+      return;
+    }
+
+    const effectiveUserId = userId || sessionStorage.getItem('cd_user_id') || 'player_' + Math.floor(Math.random() * 1000);
+    if (!userId) {
+      setUserId(effectiveUserId);
+    }
+
+    if (!battleId) {
+      setActiveTab('output');
+      setConsoleOutput("⚠️ Battle ID is missing.");
+      return;
+    }
+
     setSubmitting(true);
     setActiveTab('output');
     setConsoleOutput("⏳ Submitting solution to Judge0 evaluation sandbox...");
     setSubmissionResult(null);
 
+    const submissionPayload = {
+      battleId: battleId,
+      userId: effectiveUserId,
+      language: selectedLanguage,
+      sourceCode: effectiveCode
+    };
+
+    console.info("[BattleArena] Submitting code payload:", {
+      battleId: submissionPayload.battleId,
+      userId: submissionPayload.userId,
+      language: submissionPayload.language,
+      sourceCodeLength: submissionPayload.sourceCode.length
+    });
+
     try {
-      const response = await axios.post('http://localhost:8081/api/submissions', {
-        battleId: battleId,
-        userId: userId,
-        language: selectedLanguage,
-        sourceCode: code
-      });
+      const response = await axios.post('/api/submissions', submissionPayload);
 
       const res = response.data;
       setSubmissionResult(res);
@@ -140,8 +186,13 @@ export default function BattleArena() {
         );
       }
     } catch (err) {
-      console.error("Submission error:", err);
-      setConsoleOutput("⚠️ Submission Failed. Check if Spring Boot backend and Judge0 container are active.");
+      console.error("[BattleArena] Submission error:", err);
+      const serverMsg = err.response?.data?.errorMessage || err.response?.data?.message;
+      if (serverMsg) {
+        setConsoleOutput(`❌ Submission Error (${err.response?.status || 400}): ${serverMsg}`);
+      } else {
+        setConsoleOutput("⚠️ Submission Failed. Check if Spring Boot backend and Judge0 container are active.");
+      }
     } finally {
       setSubmitting(false);
     }
@@ -321,6 +372,9 @@ export default function BattleArena() {
               language={selectedLanguage === 'cpp' ? 'cpp' : selectedLanguage}
               theme="vs-dark"
               value={code}
+              onMount={(editor) => {
+                editorRef.current = editor;
+              }}
               onChange={(val) => setCode(val || '')}
               options={{
                 fontSize: 14,

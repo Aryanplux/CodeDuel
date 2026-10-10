@@ -29,5 +29,5 @@ public class JudgeRequest {
 
     @JsonProperty("memory_limit")
     @Builder.Default
-    private Integer memoryLimit = 256000;
+    private Integer memoryLimit = 256000; // KB (256 MB)
 }

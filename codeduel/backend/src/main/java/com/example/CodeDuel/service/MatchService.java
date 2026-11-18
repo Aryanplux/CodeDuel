@@ -35,7 +35,8 @@ public class MatchService {
         String matchId = UUID.randomUUID().toString();
         String key = MATCH_PREFIX + matchId;
         String startTime = Instant.now().toString();
-        String endsAt = Instant.now().plusSeconds(600).toString();
+        Instant endsAtInstant = Instant.now().plusSeconds(600);
+        String endsAt = endsAtInstant.toString();
         
         Problem problem = problemRepository.findRandomProblem().orElseThrow(() -> new IllegalStateException("No problems available in DB"));
         
@@ -47,6 +48,7 @@ public class MatchService {
                 .player2Name(nameB)
                 .problem(problem)
                 .startTime(LocalDateTime.now())
+                .endTime(LocalDateTime.ofInstant(endsAtInstant, java.time.ZoneId.systemDefault()))
                 .status("IN_PROGRESS")
                 .build();
         

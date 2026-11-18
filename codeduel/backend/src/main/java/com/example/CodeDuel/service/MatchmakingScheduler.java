@@ -40,6 +40,8 @@ public class MatchmakingScheduler {
         } catch (DataAccessException exception) {
             log.error("Matchmaking poll failed: Redis operation failed ({})",
                     exception.getMostSpecificCause().getMessage(), exception);
+        } catch (RuntimeException exception) {
+            log.error("Matchmaking poll failed unexpectedly", exception);
         }
     }
 
@@ -60,7 +62,8 @@ public class MatchmakingScheduler {
             if (joinTimeA == null) continue;
 
             long waitSecondsA = (now - joinTimeA) / 1000;
-            double windowA = 100 * ((waitSecondsA / 10) + 1); // Expanding window[cite: 27]
+            double baseWindowA = rankWindow(ratingA);
+            double windowA = baseWindowA * ((waitSecondsA / 15) + 1);
 
             for (int j = i + 1; j < players.size(); j++) {
                 TypedTuple<String> playerB = players.get(j);
@@ -70,7 +73,12 @@ public class MatchmakingScheduler {
                 double ratingDiff = Math.abs(ratingA - ratingB);
 
                 // Check if players fall within acceptable window[cite: 27]
-                if (userA != null && userB != null && !userA.equals(userB) && ratingDiff <= windowA) {
+                long waitSecondsB = getJoinTimestamp(userB) == null
+                        ? 0 : (now - getJoinTimestamp(userB)) / 1000;
+                double baseWindowB = rankWindow(ratingB);
+                double windowB = baseWindowB * ((waitSecondsB / 15) + 1);
+                if (userA != null && userB != null && !userA.equals(userB)
+                        && ratingDiff <= Math.max(windowA, windowB)) {
                     // Remove both from the queue before publishing the match.
                     redisTemplate.opsForZSet().remove(QUEUE_KEY, userA, userB);
                     redisTemplate.opsForHash().delete(TIME_KEY, userA, userB);
@@ -87,8 +95,17 @@ public class MatchmakingScheduler {
 
                     return; // Break iteration to prevent double matching
                 }
+
             }
         }
+    }
+
+    private double rankWindow(double elo) {
+        if (elo >= 2200) return 40;
+        if (elo >= 1800) return 55;
+        if (elo >= 1500) return 75;
+        if (elo >= 1250) return 90;
+        return 100;
     }
 
     private Map<String, String> notification(Map<String, String> match, String playerId) {
@@ -102,6 +119,12 @@ public class MatchmakingScheduler {
 
     private Long getJoinTimestamp(String userId) {
         Object val = redisTemplate.opsForHash().get(TIME_KEY, userId);
-        return val != null ? Long.parseLong(val.toString()) : null;
+        if (val == null) return null;
+        try {
+            return Long.parseLong(val.toString());
+        } catch (NumberFormatException exception) {
+            log.warn("Ignoring queue entry for {} because its timestamp is invalid", userId);
+            return null;
+        }
     }
 }

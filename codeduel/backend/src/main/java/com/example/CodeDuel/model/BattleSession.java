@@ -1,6 +1,7 @@
 package com.example.CodeDuel.model;
 
 import jakarta.persistence.*;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.*;
 import java.time.LocalDateTime;
 
@@ -30,8 +31,17 @@ public class BattleSession {
 
     private LocalDateTime endTime;
 
+    private LocalDateTime submissionDeadline;
+
     @Builder.Default
     private String status = "IN_PROGRESS"; // "IN_PROGRESS", "COMPLETED"
 
     private String winnerId; // null until battle finishes
+
+    @Transient
+    @JsonProperty("endTimeEpochMillis")
+    public Long getEndTimeEpochMillis() {
+        return endTime == null ? null
+                : endTime.atZone(java.time.ZoneId.systemDefault()).toInstant().toEpochMilli();
+    }
 }

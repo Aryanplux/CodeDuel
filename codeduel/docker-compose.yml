@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   app-db:
     image: postgres:15-alpine
@@ -12,12 +10,22 @@ services:
       - "5433:5432"
     volumes:
       - app-pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d codeduel"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
 
   redis:
     image: redis:7-alpine
     container_name: codeduel-redis
     ports:
       - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
 
   judge0-db:
     image: postgres:15-alpine
@@ -28,10 +36,17 @@ services:
       POSTGRES_PASSWORD: judge0password
     volumes:
       - judge0-pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U judge0 -d judge0"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
 
   judge0-server:
     image: judge0/judge0:latest
     container_name: codeduel-judge0
+    command: ["bash", "-c", "sudo mkdir -p /box && sudo chmod 1777 /box && exec ./scripts/server"]
+    privileged: true
     ports:
       - "2358:2358"
     environment:
@@ -42,9 +57,36 @@ services:
       POSTGRES_USER: judge0
       POSTGRES_PASSWORD: judge0password
       POSTGRES_DB: judge0
+      ENABLE_PER_PROCESS_AND_THREAD_TIME_LIMIT: "true"
+      ENABLE_PER_PROCESS_AND_THREAD_MEMORY_LIMIT: "true"
+      COUNT: "2"
     depends_on:
-      - judge0-db
-      - redis
+      judge0-db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  judge0-worker:
+    image: judge0/judge0:latest
+    container_name: codeduel-judge0-worker
+    command: ["bash", "-c", "sudo mkdir -p /box && sudo chmod 1777 /box && exec ./scripts/workers"]
+    privileged: true
+    environment:
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      POSTGRES_HOST: judge0-db
+      POSTGRES_PORT: 5432
+      POSTGRES_USER: judge0
+      POSTGRES_PASSWORD: judge0password
+      POSTGRES_DB: judge0
+      ENABLE_PER_PROCESS_AND_THREAD_TIME_LIMIT: "true"
+      ENABLE_PER_PROCESS_AND_THREAD_MEMORY_LIMIT: "true"
+      COUNT: "2"
+    depends_on:
+      judge0-db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
 
 volumes:
   app-pgdata:

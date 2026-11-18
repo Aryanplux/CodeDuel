@@ -28,3 +28,24 @@ spring:
 # Judge0 Execution Engine Host
 judge0:
   url: http://localhost:2358
+
+azure:
+  openai:
+    endpoint: ${AZURE_OPENAI_ENDPOINT:}
+    api-key: ${AZURE_OPENAI_API_KEY:}
+    deployment: ${AZURE_OPENAI_DEPLOYMENT:}
+    api-version: ${AZURE_OPENAI_API_VERSION:2024-10-21}
+
+openrouter:
+  endpoint: ${OPENROUTER_ENDPOINT:https://openrouter.ai/api/v1}
+  api-key: ${OPENROUTER_API_KEY:}
+  model: ${OPENROUTER_MODEL:}
+  http-referer: ${OPENROUTER_HTTP_REFERER:}
+  app-title: ${OPENROUTER_APP_TITLE:CodeDuel}
+
+codeduel:
+  winner:
+    execution-weight: ${CODEDUEL_WINNER_EXECUTION_WEIGHT:0.7}
+    ai-weight: ${CODEDUEL_WINNER_AI_WEIGHT:0.3}
+  submission:
+    timeout-seconds: ${CODEDUEL_SUBMISSION_TIMEOUT_SECONDS:75}

@@ -1,8 +1,16 @@
 import { Component } from 'react';
-import { Navigate, Route, Routes } from 'react-router-dom';
+import { Route, Routes } from 'react-router-dom';
 import { BattleProvider } from './context/BattleContext';
 import Lobby from './pages/Lobby';
 import BattleArena from './pages/BattleArena';
+import { AuthProvider } from './context/AuthContext';
+import ProtectedRoute from './components/ProtectedRoute';
+import AuthPage from './pages/AuthPage';
+import SignupSuccess from './pages/SignupSuccess';
+import Dashboard from './pages/Dashboard';
+import PolicyPage from './pages/PolicyPage';
+import NotFound from './pages/NotFound';
+import CookieBanner from './components/CookieBanner';
 
 class ErrorBoundary extends Component {
   state = { error: null };
@@ -14,5 +22,15 @@ class ErrorBoundary extends Component {
 }
 
 export default function App() {
-  return <ErrorBoundary><BattleProvider><Routes><Route path="/" element={<Lobby />} /><Route path="/battle/:battleId" element={<BattleArena />} /><Route path="*" element={<Navigate to="/" replace />} /></Routes></BattleProvider></ErrorBoundary>;
+  return <ErrorBoundary><AuthProvider><BattleProvider><Routes>
+    <Route path="/" element={<Lobby />} />
+    <Route path="/login" element={<AuthPage mode="login" />} />
+    <Route path="/signup" element={<AuthPage mode="signup" />} />
+    <Route path="/signup-success" element={<SignupSuccess />} />
+    <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
+    <Route path="/battle/:battleId" element={<ProtectedRoute><BattleArena /></ProtectedRoute>} />
+    <Route path="/privacy" element={<PolicyPage mode="privacy" />} />
+    <Route path="/terms" element={<PolicyPage mode="terms" />} />
+    <Route path="*" element={<NotFound />} />
+  </Routes><CookieBanner /></BattleProvider></AuthProvider></ErrorBoundary>;
 }

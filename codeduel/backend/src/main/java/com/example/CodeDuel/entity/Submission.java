@@ -29,5 +29,8 @@ public class Submission {
     private Integer testsPassed;
     private Integer totalTests;
 
+    private Double executionTimeSeconds;
+    private Integer aiQualityScore;
+
     private LocalDateTime submittedAt;
 }

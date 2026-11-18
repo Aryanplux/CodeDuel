@@ -37,5 +37,12 @@ export const getApiErrorMessage = (error) => {
 export const getBattle = (battleId) => api.get(`/battles/${encodeURIComponent(battleId)}`);
 export const submitCode = (payload) => api.post('/submissions', {
   ...payload,
+  language: payload.language?.toLowerCase().trim(),
   languageId: LANGUAGE_IDS[payload.language],
 });
+export const leaveBattle = (battleId, userId) => api.post(`/battles/${encodeURIComponent(battleId)}/leave`, { userId });
+export const signup = (payload) => api.post('/auth/signup', payload);
+export const login = (payload) => api.post('/auth/login', payload);
+export const logout = () => api.post('/auth/logout');
+export const getCurrentUser = () => api.get('/auth/me');
+export const getDashboard = () => api.get('/dashboard');

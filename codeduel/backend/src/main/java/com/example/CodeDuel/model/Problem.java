@@ -45,9 +45,11 @@ public class Problem {
 
     // Hidden test cases stored as JSON arrays for Judge0 execution
     @Column(columnDefinition = "TEXT")
+    @JsonIgnore
     private String hiddenInputsJson;
 
     @Column(columnDefinition = "TEXT")
+    @JsonIgnore
     private String hiddenOutputsJson;
 
     // Execution limits per the documentation spec

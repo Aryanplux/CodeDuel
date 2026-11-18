@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <url><loc>https://codeduel.example/</loc></url>
+  <url><loc>https://codeduel.example/login</loc></url>
+  <url><loc>https://codeduel.example/signup</loc></url>
+  <url><loc>https://codeduel.example/privacy</loc></url>
+  <url><loc>https://codeduel.example/terms</loc></url>
+</urlset>

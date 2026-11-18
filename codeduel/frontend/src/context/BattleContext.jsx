@@ -1,5 +1,6 @@
 import { createContext, useContext, useEffect, useMemo, useReducer } from 'react';
 import { websocket } from '../services/websocket';
+import { useAuth } from './AuthContext';
 
 const defaultRating = 1250;
 
@@ -22,6 +23,7 @@ const initialState = {
 
 const reducer = (state, action) => {
   switch (action.type) {
+    case 'SET_USER': return { ...state, user: action.user };
     case 'QUEUE_SEARCHING': return { ...state, queue: { status: 'SEARCHING', startedAt: Date.now(), match: null } };
     case 'MATCH_FOUND': return { ...state, queue: { ...state.queue, status: 'MATCH_FOUND', match: action.match }, opponent: { username: action.match.opponentName, rating: Number(action.match.opponentElo), presence: 'ONLINE' } };
     case 'IN_GAME': return { ...state, queue: { ...state.queue, status: 'IN_GAME' } };
@@ -52,15 +54,10 @@ const reducer = (state, action) => {
 const BattleContext = createContext(null);
 
 export function BattleProvider({ children }) {
-  const user = useMemo(() => {
-    try {
-      const localUser = getLocalUser();
-      const savedUser = JSON.parse(localStorage.getItem('cd_user') || '{}');
-      return { ...localUser, ...savedUser, userId: localUser.userId, username: localUser.username };
-    } catch {
-      return getLocalUser();
-    }
-  }, []);
+  const { user: authenticatedUser } = useAuth();
+  const user = useMemo(() => authenticatedUser
+    ? { userId: authenticatedUser.id, username: authenticatedUser.username, rating: authenticatedUser.elo }
+    : getLocalUser(), [authenticatedUser]);
   const [state, dispatch] = useReducer(reducer, { ...initialState, user });
 
   useEffect(() => {
@@ -68,6 +65,10 @@ export function BattleProvider({ children }) {
     websocket.connect();
     return removeListener;
   }, []);
+
+  useEffect(() => {
+    dispatch({ type: 'SET_USER', user });
+  }, [user]);
 
   const value = useMemo(() => ({ state, dispatch }), [state]);
   return <BattleContext.Provider value={value}>{children}</BattleContext.Provider>;

@@ -17,4 +17,7 @@ public class SubmissionResponse {
     private String executionTime;
     private String memoryUsed;
     private String errorMessage;
+    private CodeQualityReview aiReview;
+    private java.util.List<TestCaseResult> testCases;
+    private boolean locked;
 }

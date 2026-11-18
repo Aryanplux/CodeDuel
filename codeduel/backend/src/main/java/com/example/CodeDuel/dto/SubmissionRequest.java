@@ -22,10 +22,17 @@ public class SubmissionRequest {
     private String userId;
 
     @JsonProperty("language")
-    @JsonAlias({"lang", "language_id", "languageId"})
+    @JsonAlias({"lang"})
     private String language; // "python", "java", "cpp"
+
+    @JsonProperty("languageId")
+    @JsonAlias({"language_id", "languageID"})
+    private Integer languageId;
 
     @JsonProperty("sourceCode")
     @JsonAlias({"source_code", "code", "source"})
     private String sourceCode;
+
+    @JsonProperty("sampleRun")
+    private boolean sampleRun;
 }

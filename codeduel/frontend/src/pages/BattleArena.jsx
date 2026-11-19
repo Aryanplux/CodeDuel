@@ -126,7 +126,7 @@ export default function BattleArena() {
   useEffect(() => {
     if (!battleId) return undefined;
 
-    const socket = new SockJS('/ws');
+    const socket = new SockJS(import.meta.env.VITE_WS_URL || '/ws');
     const stompClient = new Client({
       webSocketFactory: () => socket,
       reconnectDelay: 5000,

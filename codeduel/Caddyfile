@@ -1,0 +1,17 @@
+{$DOMAIN_NAME:codeduel.tech}, www.{$DOMAIN_NAME:codeduel.tech} {
+	encode zstd gzip
+
+	@api path /api/*
+	handle @api {
+		reverse_proxy backend:8081
+	}
+
+	@ws path /ws/*
+	handle @ws {
+		reverse_proxy backend:8081
+	}
+
+	handle {
+		reverse_proxy frontend:80
+	}
+}

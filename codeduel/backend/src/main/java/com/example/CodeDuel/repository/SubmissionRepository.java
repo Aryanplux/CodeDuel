@@ -2,6 +2,8 @@ package com.example.CodeDuel.repository;
 
 import com.example.CodeDuel.entity.Submission;
 import org.springframework.data.jpa.repository.JpaRepository;
+import java.util.Collection;
+import java.util.List;
 
 public interface SubmissionRepository extends JpaRepository<Submission, Long> {
     java.util.List<Submission> findByBattleIdAndStatusOrderBySubmittedAtAsc(
@@ -11,4 +13,6 @@ public interface SubmissionRepository extends JpaRepository<Submission, Long> {
 
     java.util.List<Submission> findByBattleIdAndUserIdOrderBySubmittedAtDesc(
             String battleId, String userId);
+
+    List<Submission> findByBattleIdInOrderBySubmittedAtAsc(Collection<String> battleIds);
 }

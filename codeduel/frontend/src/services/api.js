@@ -17,7 +17,12 @@ api.interceptors.response.use(
   (error) => {
     if (error.response?.status === 401) {
       localStorage.removeItem('cd_token');
-      window.location.assign('/login');
+      const path = window.location.pathname;
+      const isAuthRequest = String(error.config?.url || '').includes('/auth/');
+      const isAuthPage = path === '/login' || path === '/signup';
+      if (!isAuthRequest && !isAuthPage) {
+        window.location.replace('/login');
+      }
     }
     return Promise.reject(error);
   },

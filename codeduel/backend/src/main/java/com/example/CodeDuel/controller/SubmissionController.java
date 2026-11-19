@@ -478,17 +478,32 @@ public class SubmissionController {
         }
     }
 
-    @Scheduled(fixedDelay = 1000)
+    @Scheduled(fixedDelay = 5000, initialDelay = 5000)
     void finalizeExpiredSubmissionWindows() {
         List<BattleSession> expired = battleSessionRepository
-                .findByStatus("IN_PROGRESS");
+                .findByStatusWithProblem("IN_PROGRESS");
+        if (expired.isEmpty()) {
+            return;
+        }
+
+        List<String> battleIds = expired.stream()
+                .map(BattleSession::getBattleId)
+                .toList();
+        Map<String, List<Submission>> submissionsByBattle = new java.util.HashMap<>();
+        for (Submission submission : submissionRepository
+                .findByBattleIdInOrderBySubmittedAtAsc(battleIds)) {
+            submissionsByBattle
+                    .computeIfAbsent(submission.getBattleId(), key -> new java.util.ArrayList<>())
+                    .add(submission);
+        }
+
         for (BattleSession session : expired) {
+            List<Submission> submissions = submissionsByBattle
+                    .getOrDefault(session.getBattleId(), java.util.Collections.emptyList());
             if (session.getEndTime() != null && !session.getEndTime().isAfter(LocalDateTime.now())) {
-                finalizeExpiredBattle(session);
+                finalizeExpiredBattle(session, submissions);
                 continue;
             }
-            List<Submission> submissions = submissionRepository
-                    .findByBattleIdOrderBySubmittedAtAsc(session.getBattleId());
             if (submissions.isEmpty()) {
                 continue;
             }
@@ -539,9 +554,7 @@ public class SubmissionController {
         }
     }
 
-    private void finalizeExpiredBattle(BattleSession session) {
-        List<Submission> submissions = submissionRepository
-                .findByBattleIdOrderBySubmittedAtAsc(session.getBattleId());
+    private void finalizeExpiredBattle(BattleSession session, List<Submission> submissions) {
         Set<String> submittedPlayers = submissions.stream()
                 .map(Submission::getUserId)
                 .collect(java.util.stream.Collectors.toSet());

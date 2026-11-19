@@ -5,10 +5,15 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
+import org.springframework.data.jpa.repository.EntityGraph;
 
 @Repository
 public interface BattleSessionRepository extends JpaRepository<BattleSession, String> {
     java.util.List<BattleSession> findByStatus(String status);
+
+    @EntityGraph(attributePaths = "problem")
+    @Query("select b from BattleSession b where b.status = :status")
+    java.util.List<BattleSession> findByStatusWithProblem(@Param("status") String status);
 
     java.util.List<BattleSession> findByStatusAndSubmissionDeadlineBefore(
             String status, java.time.LocalDateTime deadline);

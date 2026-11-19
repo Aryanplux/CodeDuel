@@ -7,11 +7,13 @@ import MatchResultModal from '../components/MatchResultModal';
 import { useBattle } from '../context/BattleContext';
 import { getApiErrorMessage, getBattle, submitCode } from '../services/api';
 import Seo from '../components/Seo';
+import { useAuth } from '../context/AuthContext';
 
 export default function BattleArena() {
   const { battleId } = useParams();
   const navigate = useNavigate();
   const { state } = useBattle();
+  const { user: authenticatedUser } = useAuth();
 
   // Battle & Problem state
   const [loading, setLoading] = useState(true);
@@ -52,7 +54,9 @@ export default function BattleArena() {
 
   // 1. Fetch Battle Details & Setup Current User Session
   useEffect(() => {
-    const currentUserId = sessionStorage.getItem('cd_user_id') || 'player_' + Math.floor(Math.random() * 1000);
+    const currentUserId = authenticatedUser?.id
+      || sessionStorage.getItem('cd_user_id')
+      || 'player_' + Math.floor(Math.random() * 1000);
     setUserId(currentUserId);
 
     if (!battleId) return;
@@ -85,7 +89,7 @@ export default function BattleArena() {
         setLoadError(getApiErrorMessage(err));
         setLoading(false);
       });
-  }, [battleId]);
+  }, [battleId, authenticatedUser?.id]);
 
   useEffect(() => {
     if (!battleId || !userId) return undefined;

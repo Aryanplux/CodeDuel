@@ -25,6 +25,9 @@ public class Judge0Service {
     @Value("${judge0.url:http://localhost:2358}")
     private String judge0BaseUrl;
 
+    @Value("${judge0.api-key:}")
+    private String judge0ApiKey;
+
     /**
      * Map language string to Judge0 Language ID
      */
@@ -80,11 +83,15 @@ public class Judge0Service {
             log.debug("[Judge0Service] Judge0 request JSON fields: source_code={}, language_id={}",
                     sourceCode.length(), languageId);
 
-            HttpRequest request = HttpRequest.newBuilder()
+            HttpRequest.Builder requestBuilder = HttpRequest.newBuilder()
                     .uri(URI.create(targetUrl))
                     .timeout(Duration.ofSeconds(15))
                     .header("Content-Type", "application/json")
-                    .header("Accept", "application/json")
+                    .header("Accept", "application/json");
+            if (judge0ApiKey != null && !judge0ApiKey.isBlank()) {
+                requestBuilder.header("X-Auth-Token", judge0ApiKey);
+            }
+            HttpRequest request = requestBuilder
                     .POST(HttpRequest.BodyPublishers.ofString(requestJson))
                     .build();
 

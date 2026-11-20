@@ -16,7 +16,11 @@ const notify = (next) => {
 const ensureClient = () => {
   if (client) return client;
   client = new Client({
-    webSocketFactory: () => new SockJS(import.meta.env.VITE_WS_URL || '/ws'),
+    webSocketFactory: () => new SockJS(
+      import.meta.env.VITE_WS_URL || '/ws',
+      null,
+      { withCredentials: true }
+    ),
     reconnectDelay: retryDelay,
     heartbeatIncoming: 10000,
     heartbeatOutgoing: 10000,
